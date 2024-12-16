@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Carrito - Ferretería Online</title>
+    <link rel="stylesheet" href="assets/estilos.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Ferretería Online</h1>
+            <nav>
+                <a href="productos.html" class="btn btn-link text-white">Catálogo</a>
+                <a href="carrito.html" class="btn btn-danger">Carrito</a>
+                <a href="login.html" class="btn btn-link text-white">Cerrar Sesión</a>
+            </nav>
+        </div>
+    </header>
+
+    <section class="hero py-4">
+        <div class="container">
+            <h2 class="text-center">Carrito</h2>
+        </div>
+    </section>
+
+    <main class="container my-5">
+        <section id="carrito-lista" class="table-responsive">
+            <table class="carrito-table table table-striped">
+                <thead class="table-light">
+                    <tr>
+                        <th>Producto</th>
+                        <th>Precio Unitario</th>
+                        <th>Cantidad</th>
+                        <th>Subtotal</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Productos del carrito se cargarán dinámicamente aquí -->
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="3" class="text-end"><strong>Total en CLP:</strong></td>
+                        <td id="total-precio">0 CLP</td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td colspan="3" class="text-end"><strong>Total en USD:</strong></td>
+                        <td id="total-usd">Calculando...</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </section>
+
+        <div class="carrito-total mt-4 text-end">
+            <!-- Formulario para enviar el monto en USD -->
+            <form id="transbankForm" method="POST" action="backend/procesar_pago.php">
+                <input type="hidden" name="amount_usd" id="amountUsdInput">
+                <button type="submit" class="btn btn-primary">Pagar en USD</button>
+            </form>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2023 Ferretería Online. Todos los derechos reservados.</p>
+    </footer>
+
+    <script>
+        let carrito = JSON.parse(localStorage.getItem("carrito")) || [];
+
+        function renderizarCarrito() {
+            const tbody = document.querySelector(".carrito-table tbody");
+            let totalCLP = 0;
+
+            tbody.innerHTML = "";
+
+            carrito.forEach((producto, index) => {
+                const subtotal = producto.precio * producto.cantidad;
+                totalCLP += subtotal;
+
+                const row = `
+                    <tr>
+                        <td>${producto.nombre}</td>
+                        <td>$${producto.precio.toFixed(2)} CLP</td>
+                        <td>
+                            <div class="btn-group" role="group">
+                                <button class="btn btn-secondary btn-sm" onclick="actualizarCantidad(${index}, -1)">-</button>
+                                <span class="mx-2">${producto.cantidad}</span>
+                                <button class="btn btn-secondary btn-sm" onclick="actualizarCantidad(${index}, 1)">+</button>
+                            </div>
+                        </td>
+                        <td>$${subtotal.toFixed(2)} CLP</td>
+                        <td>
+                            <button class="btn btn-danger btn-sm" onclick="eliminarProducto(${index})">Eliminar</button>
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+
+            document.getElementById("total-precio").innerText = `${totalCLP.toFixed(2)} CLP`;
+            convertirMoneda(totalCLP);
+        }
+
+        function eliminarProducto(index) {
+            carrito.splice(index, 1); // Eliminar producto del carrito
+            localStorage.setItem("carrito", JSON.stringify(carrito)); // Actualizar localStorage
+            renderizarCarrito(); // Renderizar nuevamente
+        }
+
+        function actualizarCantidad(index, cambio) {
+            const producto = carrito[index];
+            const nuevaCantidad = producto.cantidad + cambio;
+            
+            if (nuevaCantidad > 0) {
+                producto.cantidad = nuevaCantidad;
+                localStorage.setItem("carrito", JSON.stringify(carrito));
+                renderizarCarrito();
+                
+                // Mostramos un mensaje de éxito
+                mostrarMensaje('Cantidad actualizada correctamente');
+            }
+        }
+
+        // Función auxiliar para mostrar mensajes
+        function mostrarMensaje(mensaje) {
+            // Crear elemento para el mensaje
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 end-0 m-3';
+            alertDiv.role = 'alert';
+            alertDiv.innerHTML = `
+                ${mensaje}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            
+            // Añadir al documento
+            document.body.appendChild(alertDiv);
+            
+            // Eliminar después de 3 segundos
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 3000);
+        }
+
+        async function convertirMoneda(totalCLP) {
+            const resultadoUSD = document.getElementById("total-usd");
+
+            try {
+                const respuesta = await fetch("https://mindicador.cl/api");
+                if (!respuesta.ok) throw new Error("Error al obtener datos de la API.");
+
+                const datos = await respuesta.json();
+                const tipoCambioUSD = datos.dolar.valor;
+
+                const conversionUSD = (totalCLP / tipoCambioUSD).toFixed(2);
+                resultadoUSD.innerText = `${conversionUSD} USD`;
+
+                // Actualizar el monto en USD en el formulario oculto
+                document.getElementById("amountUsdInput").value = conversionUSD;
+            } catch (error) {
+                resultadoUSD.innerText = `Error: ${error.message}`;
+            }
+        }
+
+        // Inicializar carrito al cargar la página
+        document.addEventListener("DOMContentLoaded", () => {
+            renderizarCarrito();
+        });
+    </script>
+</body>
+</html>
